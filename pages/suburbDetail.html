@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Suburb Detail</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f9f9f9;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            color: #333;
+        }
+
+        #detail,
+        #amenities,
+        #demographics {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .error {
+            color: red;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    Back to <a href="index.html">Suburb List</a>
+    <h1>Suburb Detail Dashboard</h1>
+
+
+
+    <div id="detail">Loading...</div>
+    <div id="amenities"></div>
+    <div id="demographics"></div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const suburb = urlParams.get('suburb') || "Belmont North"; // default
+
+        const detailDiv = document.getElementById('detail');
+        const amenDiv = document.getElementById('amenities');
+        const demoDiv = document.getElementById('demographics');
+
+        fetch(`http://127.0.0.1:5001/api/suburbDetail?suburb=${encodeURIComponent(suburb)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    detailDiv.innerHTML = `<p class="error">${data.error}</p>`;
+                    return;
+                }
+
+                // Suburb title
+                detailDiv.innerHTML = `<h2>${data.suburb}</h2>`;
+
+                // --- Amenities ---
+                const categories = data.amenities.category_counts || {};
+                let amenHtml = `<h3>Amenities</h3>`;
+                amenHtml += `<p>${data.amenities.summary}</p>`;
+                if (Object.keys(categories).length > 0) {
+                    amenHtml += `<table><tr><th>Category</th><th>Count</th></tr>`;
+                    for (const [cat, count] of Object.entries(categories)) {
+                        amenHtml += `<tr><td>${cat}</td><td>${count}</td></tr>`;
+                    }
+                    amenHtml += `</table>`;
+                } else {
+                    amenHtml += `<p>No amenity data available.</p>`;
+                }
+                amenDiv.innerHTML = amenHtml;
+
+                // --- Demographics ---
+                const ageBrackets = data.demographics.age_brackets || [];
+                const incomeData = data.demographics.income || [];
+                const populationData = data.demographics.population || [];
+
+                // Group age brackets by age
+                const groupedAges = {};
+                ageBrackets.forEach(item => {
+                    if (!groupedAges[item.age]) groupedAges[item.age] = {};
+                    groupedAges[item.age][item.gender] = item.proportion;
+                });
+
+                const ageOrder = ["0-17", "18-24", "25-44", "45-64", "65+", "Total"];
+
+                let demoHtml = `<h3>Demographics</h3>`;
+
+                // Age Distribution Table
+                if (Object.keys(groupedAges).length > 0) {
+                    demoHtml += `<h4>Age Distribution</h4>`;
+                    demoHtml += `<table><tr><th>Age</th><th>Females</th><th>Males</th><th>Persons</th></tr>`;
+                    ageOrder.forEach(age => {
+                        const genders = groupedAges[age];
+                        if (genders) {
+                            demoHtml += `<tr>
+                                <td>${age}</td>
+                                <td>${genders.females !== undefined ? (genders.females * 100).toFixed(1) + "%" : "N/A"}</td>
+                                <td>${genders.males !== undefined ? (genders.males * 100).toFixed(1) + "%" : "N/A"}</td>
+                                <td>${genders.persons !== undefined ? (genders.persons * 100).toFixed(1) + "%" : "N/A"}</td>
+                            </tr>`;
+                        }
+                    });
+                    demoHtml += `</table>`;
+                }
+
+                // Income Table
+                if (incomeData.length > 0) {
+                    demoHtml += `<h4>Income</h4>`;
+                    demoHtml += `<table><tr><th>Income Bracket</th><th>Proportion</th></tr>`;
+                    incomeData.forEach(item => {
+                        demoHtml += `<tr>
+                            <td>${item.income_bracket}</td>
+                            <td>${(item.proportion * 100).toFixed(1)}%</td>
+                        </tr>`;
+                    });
+                    demoHtml += `</table>`;
+                }
+
+                // Population Table
+                if (populationData.length > 0) {
+                    demoHtml += `<h4>Population Over Time</h4>`;
+                    demoHtml += `<table><tr><th>Date</th><th>Population</th></tr>`;
+                    populationData.forEach(item => {
+                        demoHtml += `<tr>
+                            <td>${item.date ? new Date(item.date).toLocaleDateString() : "Unknown"}</td>
+                            <td>${item.value ?? "N/A"}</td>
+                        </tr>`;
+                    });
+                    demoHtml += `</table>`;
+                }
+
+                demoDiv.innerHTML = demoHtml;
+
+            })
+            .catch(err => {
+                detailDiv.innerHTML = `<p class="error">Error fetching data: ${err}</p>`;
+            });
+    </script>
+</body>
+
+</html>
